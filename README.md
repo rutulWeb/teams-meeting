@@ -5,6 +5,7 @@ It uses Microsoft Graph application authentication (client credentials flow), pl
 
 - REST API: `POST /api/meetings`
 - Web UI: `http://localhost:3000`
+- Full runbook: `SETUP_AND_OPERATIONS_GUIDE.md`
 
 ## 1) Prerequisites
 
