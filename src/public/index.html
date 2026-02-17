@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teams Meeting Creator</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Teams Meeting Creator</h1>
+      <p class="subtext">Create Microsoft Teams meetings without end-user login.</p>
+      <p class="subtext">Need debug console? Open <a href="/test.html">/test.html</a>.</p>
+
+      <form id="meetingForm" class="card">
+        <label for="subject">Meeting Subject</label>
+        <input id="subject" name="subject" type="text" required maxlength="150" />
+
+        <label for="startDateTime">Start Date/Time</label>
+        <input id="startDateTime" name="startDateTime" type="datetime-local" required />
+
+        <label for="endDateTime">End Date/Time</label>
+        <input id="endDateTime" name="endDateTime" type="datetime-local" required />
+
+        <button id="submitBtn" type="submit">Create Meeting</button>
+      </form>
+
+      <section id="resultCard" class="card hidden" aria-live="polite">
+        <h2>Meeting Created</h2>
+        <p><strong>Subject:</strong> <span id="resultSubject"></span></p>
+        <p><strong>Start:</strong> <span id="resultStart"></span></p>
+        <p><strong>End:</strong> <span id="resultEnd"></span></p>
+        <p><strong>Organizer:</strong> <span id="resultOrganizer"></span></p>
+        <p><strong>Join URL:</strong></p>
+        <a id="resultJoinUrl" target="_blank" rel="noopener noreferrer"></a>
+        <button id="copyBtn" type="button">Copy Join URL</button>
+      </section>
+
+      <section id="errorCard" class="card hidden error" aria-live="assertive">
+        <h2>Failed to Create Meeting</h2>
+        <p id="errorMessage"></p>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById("meetingForm");
+      const submitBtn = document.getElementById("submitBtn");
+      const copyBtn = document.getElementById("copyBtn");
+      const resultCard = document.getElementById("resultCard");
+      const errorCard = document.getElementById("errorCard");
+      const errorMessage = document.getElementById("errorMessage");
+      const resultSubject = document.getElementById("resultSubject");
+      const resultStart = document.getElementById("resultStart");
+      const resultEnd = document.getElementById("resultEnd");
+      const resultOrganizer = document.getElementById("resultOrganizer");
+      const resultJoinUrl = document.getElementById("resultJoinUrl");
+
+      function toIsoString(localDateTime) {
+        return new Date(localDateTime).toISOString();
+      }
+
+      function hideMessages() {
+        resultCard.classList.add("hidden");
+        errorCard.classList.add("hidden");
+      }
+
+      function validateDates(startDateTime, endDateTime) {
+        const start = new Date(startDateTime);
+        const end = new Date(endDateTime);
+        return end > start;
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        hideMessages();
+
+        const formData = new FormData(form);
+        const subject = String(formData.get("subject") || "").trim();
+        const startDateTime = String(formData.get("startDateTime") || "");
+        const endDateTime = String(formData.get("endDateTime") || "");
+
+        if (!validateDates(startDateTime, endDateTime)) {
+          errorMessage.textContent = "End date/time must be after start date/time.";
+          errorCard.classList.remove("hidden");
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Creating...";
+
+        try {
+          const response = await fetch("/api/meetings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              subject,
+              startDateTime: toIsoString(startDateTime),
+              endDateTime: toIsoString(endDateTime),
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.message || "Unable to create meeting");
+          }
+
+          resultSubject.textContent = data.subject;
+          resultStart.textContent = new Date(data.startDateTime).toLocaleString();
+          resultEnd.textContent = new Date(data.endDateTime).toLocaleString();
+          resultOrganizer.textContent = data.organizer;
+          resultJoinUrl.href = data.joinUrl;
+          resultJoinUrl.textContent = data.joinUrl;
+          resultCard.classList.remove("hidden");
+        } catch (error) {
+          errorMessage.textContent = error.message;
+          errorCard.classList.remove("hidden");
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Create Meeting";
+        }
+      });
+
+      copyBtn.addEventListener("click", async () => {
+        if (!resultJoinUrl.textContent) {
+          return;
+        }
+        await navigator.clipboard.writeText(resultJoinUrl.textContent);
+        copyBtn.textContent = "Copied";
+        setTimeout(() => {
+          copyBtn.textContent = "Copy Join URL";
+        }, 1200);
+      });
+    </script>
+  </body>
+</html>
